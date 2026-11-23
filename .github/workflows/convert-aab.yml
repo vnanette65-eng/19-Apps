@@ -1,0 +1,74 @@
+name: Nationestore AAB to APK converter
+
+on:
+  workflow_dispatch:
+    inputs:
+      aab_url:
+        description: HTTPS download URL of the Android App Bundle (.aab)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  convert:
+    name: Convert AAB into universal APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Download Android App Bundle
+        env:
+          AAB_URL: ${{ inputs.aab_url }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlparse
+          u = urlparse(os.environ["AAB_URL"])
+          if u.scheme != "https" or not u.hostname:
+              raise SystemExit("Only valid HTTPS AAB URLs are accepted.")
+          if not u.path.lower().endswith(".aab"):
+              raise SystemExit("The URL must point directly to a .aab file.")
+          PY
+          curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 --max-filesize 1073741824 "$AAB_URL" -o input.aab
+          test -s input.aab
+          unzip -t input.aab
+
+      - name: Download Google bundletool
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            https://github.com/google/bundletool/releases/download/1.18.2/bundletool-all-1.18.2.jar \
+            -o bundletool.jar
+          test -s bundletool.jar
+
+      - name: Build universal APK
+        run: |
+          set -euo pipefail
+          java -jar bundletool.jar build-apks \
+            --bundle=input.aab \
+            --output=converted.apks \
+            --mode=universal \
+            --overwrite
+          mkdir universal
+          unzip -q converted.apks 'universal.apk' -d universal
+          test -s universal/universal.apk
+          mv universal/universal.apk Nationestore-converted-universal.apk
+          sha256sum Nationestore-converted-universal.apk | tee SHA256SUMS.txt
+
+      - name: Upload converted APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: nationestore-converted-universal-apk
+          path: |
+            Nationestore-converted-universal.apk
+            SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7

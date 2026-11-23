@@ -1,7 +1,6 @@
 package com.nationhub.appvault
 
 import android.app.Activity
-import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
@@ -80,7 +79,6 @@ class MainActivity : Activity() {
         }
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(9, 17, 31)
@@ -93,8 +91,10 @@ class MainActivity : Activity() {
         configureWebView()
 
         val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        else @Suppress("DEPRECATION") registerReceiver(downloadReceiver, filter)
+        androidx.core.content.ContextCompat.registerReceiver(
+            this, downloadReceiver, filter,
+            androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState)

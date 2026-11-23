@@ -1,6 +1,7 @@
 package com.nationhub.appvault
 
 import android.app.Activity
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.DownloadManager
 import android.content.BroadcastReceiver
@@ -79,6 +80,7 @@ class MainActivity : Activity() {
         }
     }
 
+    @SuppressLint("UnspecifiedRegisterReceiverFlag")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Color.rgb(9, 17, 31)

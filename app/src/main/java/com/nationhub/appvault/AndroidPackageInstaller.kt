@@ -31,7 +31,7 @@ object AndroidPackageInstaller {
                 val packages = apkFiles.map { packageInfo(context, it) }
                 val packageNames = packages.map { it.packageName }.distinct()
                 require(packageNames.size == 1) { "The archive contains APKs from different applications." }
-                require(packages.count { it.splitName.isNullOrBlank() } == 1) {
+                require(packages.count { it.splitNames.isNullOrEmpty() } == 1) {
                     "The archive must contain exactly one base APK and its optional split APKs."
                 }
 
@@ -75,7 +75,7 @@ object AndroidPackageInstaller {
                 require(apkFiles.isNotEmpty()) { "No APK files found." }
                 val parts = apkFiles.map { file ->
                     val info = packageInfo(context, file)
-                    (info.splitName ?: "base") to file
+                    (info.splitNames?.singleOrNull() ?: "base") to file
                 }
                 val packageNames = apkFiles.map { packageInfo(context, it).packageName }.distinct()
                 require(packageNames.size == 1 && parts.count { it.first == "base" } == 1) {

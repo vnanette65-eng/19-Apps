@@ -34,6 +34,7 @@ class MainActivity : Activity() {
     private lateinit var pageProgress: ProgressBar
     private lateinit var downloadManager: DownloadManager
     private var activeDownloadId: Long = -1L
+    private var activeDownloadExtension: String = "apk"
     private var pageHasError = false
 
     private val downloadReceiver = object : BroadcastReceiver() {
@@ -43,14 +44,13 @@ class MainActivity : Activity() {
                 Toast.makeText(this@MainActivity, "Download failed. Please try again.", Toast.LENGTH_LONG).show()
                 return
             }
-            val fileName = downloadManager.getUriForDownloadedFile(activeDownloadId)?.lastPathSegment ?: "download.apk"
-            val lowerName = fileName.lowercase()
-            if (lowerName.endsWith(".aab")) {
+            val lowerName = activeDownloadExtension.lowercase()
+            if (lowerName == "aab") {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("AAB conversion required")
                     .setMessage("Android App Bundle (.aab) files cannot be installed directly. Nationestore must first convert this bundle into installable APK files using Google's bundletool on a trusted build server. This file has not been installed.")
                     .setPositiveButton("OK", null).show()
-            } else if (lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") || lowerName.endsWith(".apkm")) {
+            } else if (lowerName in listOf("xapk", "apks", "apkm")) {
                 AndroidPackageInstaller.scanAndInstall(this@MainActivity, uri) { message ->
                     runOnUiThread {
                         AlertDialog.Builder(this@MainActivity).setTitle("Nationestore Security Shield")
@@ -290,6 +290,7 @@ class MainActivity : Activity() {
             Toast.makeText(this, "For safety, app downloads must use a secure HTTPS link.", Toast.LENGTH_LONG).show()
             return
         }
+        activeDownloadExtension = extension
         val fileName = "nationestore-${System.currentTimeMillis()}.$extension"
         val request = DownloadManager.Request(parsed)
             .setTitle("Nationestore app download")

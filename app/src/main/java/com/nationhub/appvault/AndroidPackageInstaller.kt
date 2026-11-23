@@ -123,7 +123,7 @@ object AndroidPackageInstaller {
             while (entries.hasMoreElements()) {
                 val entry = entries.nextElement()
                 if (entry.isDirectory || !entry.name.lowercase().endsWith(".apk")) continue
-                val segments = entry.name.replace('\\\\', '/').split('/')
+                val segments = entry.name.replace("\\\\", "/").split('/')
                 require(!entry.name.startsWith('/') && segments.none { it == ".." }) {
                     "Unsafe archive path detected."
                 }

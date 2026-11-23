@@ -216,7 +216,7 @@ class MainActivity : Activity() {
         val script = """
             (function() {
               function hideBadge() {
-                var pattern = /(?:made|built|powered)\\s+with\\s+base44/i;
+                var pattern = /(?:made|built|powered)\s+with\s+base44/i;
                 var nodes = document.querySelectorAll('a,button,div,span,[role="link"]');
                 nodes.forEach(function(node) {
                   var text = (node.innerText || node.textContent || '').trim();

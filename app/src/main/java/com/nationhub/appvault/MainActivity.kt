@@ -177,6 +177,7 @@ class MainActivity : Activity() {
             }
 
             override fun onPageFinished(view: WebView?, url: String?) {
+                hideBase44BadgeInNativeApp()
                 if (!pageHasError) {
                     loadingPanel.visibility = View.GONE
                     errorPanel.visibility = View.GONE
@@ -205,6 +206,41 @@ class MainActivity : Activity() {
             if (isApk) enqueueApkDownload(url, contentDisposition)
             else Toast.makeText(this, "This file is not an Android APK.", Toast.LENGTH_SHORT).show()
         })
+    }
+
+    /**
+     * Hides only the Base44 promotional badge inside the Android WebView.
+     * This does not modify the website itself or remove other site content.
+     */
+    private fun hideBase44BadgeInNativeApp() {
+        val script = """
+            (function() {
+              function hideBadge() {
+                var pattern = /(?:made|built|powered)\\s+with\\s+base44/i;
+                var nodes = document.querySelectorAll('a,button,div,span,[role="link"]');
+                nodes.forEach(function(node) {
+                  var text = (node.innerText || node.textContent || '').trim();
+                  if (!text || text.length > 100 || !pattern.test(text)) return;
+                  var target = node;
+                  for (var i = 0; i < 4 && target.parentElement; i++) {
+                    var style = window.getComputedStyle(target);
+                    var rect = target.getBoundingClientRect();
+                    if (style.position === 'fixed' || /badge|branding|watermark/i.test((target.className || '') + ' ' + (target.id || ''))) break;
+                    if (rect.width > 360 || rect.height > 100) break;
+                    target = target.parentElement;
+                  }
+                  target.style.setProperty('display', 'none', 'important');
+                  target.setAttribute('aria-hidden', 'true');
+                });
+              }
+              hideBadge();
+              if (!window.__nationestoreBadgeObserver) {
+                window.__nationestoreBadgeObserver = new MutationObserver(hideBadge);
+                window.__nationestoreBadgeObserver.observe(document.documentElement, { childList: true, subtree: true });
+              }
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(script, null)
     }
 
     private fun loadStore() {

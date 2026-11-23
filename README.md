@@ -16,3 +16,18 @@ This is an initial project scaffold, not a release-ready app. The Nationestore p
 
 ## Build
 Open in Android Studio with JDK 17 and Android SDK 35. The first build requires internet access to download Gradle plugins and Android dependencies.
+
+
+## AAB conversion (Google bundletool)
+
+Nationestore includes a GitHub Actions workflow that converts a directly downloadable Android App Bundle into a universal APK:
+
+1. Open the repository's **Actions** tab.
+2. Select **Nationestore AAB to APK converter**.
+3. Choose **Run workflow** and paste the direct HTTPS URL ending in `.aab`.
+4. Wait for the workflow to finish successfully.
+5. Open the run's **Artifacts** section and download `nationestore-converted-universal-apk`.
+
+The generated APK is signed with bundletool's default debug key unless a production signing configuration is added. It is suitable for testing, not as a replacement for an app publisher's original signing identity. Installing an update over an existing app generally requires the same signing certificate. AAB conversion is currently a manual, server-side workflow; the Android client does not yet trigger this workflow automatically. The workflow accepts only direct HTTPS URLs ending in `.aab`, checks the archive, and stores the converted APK as a short-lived GitHub Actions artifact.
+
+XAPK/APKS/APKM handling is separate and uses the native split-package installation path. All installation remains subject to Android's package verification and user confirmation.

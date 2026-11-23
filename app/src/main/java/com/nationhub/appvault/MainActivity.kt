@@ -33,18 +33,18 @@ class MainActivity : Activity() {
     private lateinit var errorPanel: LinearLayout
     private lateinit var pageProgress: ProgressBar
     private lateinit var downloadManager: DownloadManager
-    private var activeDownloadId: Long = -1L
-    private var activeDownloadExtension: String = "apk"
+    private val downloadExtensions = java.util.concurrent.ConcurrentHashMap<Long, String>()
     private var pageHasError = false
 
     private val downloadReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) != activeDownloadId) return
-            val uri = downloadManager.getUriForDownloadedFile(activeDownloadId) ?: run {
+            val completedId = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: return
+            val extension = downloadExtensions.remove(completedId) ?: return
+            val uri = downloadManager.getUriForDownloadedFile(completedId) ?: run {
                 Toast.makeText(this@MainActivity, "Download failed. Please try again.", Toast.LENGTH_LONG).show()
                 return
             }
-            val lowerName = activeDownloadExtension.lowercase()
+            val lowerName = extension.lowercase()
             if (lowerName == "aab") {
                 AlertDialog.Builder(this@MainActivity)
                     .setTitle("AAB conversion required")
@@ -290,7 +290,6 @@ class MainActivity : Activity() {
             Toast.makeText(this, "For safety, app downloads must use a secure HTTPS link.", Toast.LENGTH_LONG).show()
             return
         }
-        activeDownloadExtension = extension
         val fileName = "nationestore-${System.currentTimeMillis()}.$extension"
         val request = DownloadManager.Request(parsed)
             .setTitle("Nationestore app download")
@@ -298,7 +297,8 @@ class MainActivity : Activity() {
             .setMimeType(if (extension == "apk") "application/vnd.android.package-archive" else "application/octet-stream")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName)
-        activeDownloadId = downloadManager.enqueue(request)
+        val downloadId = downloadManager.enqueue(request)
+        downloadExtensions[downloadId] = extension
         Toast.makeText(this, "Download started. You’ll be asked to review the security check before installation.", Toast.LENGTH_LONG).show()
     }
 

@@ -43,28 +43,36 @@ class MainActivity : Activity() {
                 Toast.makeText(this@MainActivity, "Download failed. Please try again.", Toast.LENGTH_LONG).show()
                 return
             }
-            ApkSecurityScanner.scan(this@MainActivity, uri) { report ->
-                runOnUiThread {
-                    if (!report.isInstallAllowed) {
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Installation blocked")
-                            .setMessage("Nationestore could not verify this APK's basic package information. It will not be opened.\n\n${report.summary}")
-                            .setPositiveButton("OK", null)
-                            .show()
-                    } else {
-                        val details = buildString {
-                            append("Package: ${report.packageName ?: "Unknown"}\n")
-                            append("Version: ${report.versionName ?: "Unknown"}\n")
-                            append("SHA-256: ${report.sha256}\n\n")
-                            append(if (report.warnings.isEmpty()) "No basic static-check warnings were found." else "Warnings:\n• " + report.warnings.joinToString("\n• "))
-                            append("\n\nThis is a basic static check, not a full antivirus scan. Android will perform its own checks and ask you to confirm installation.")
+            val fileName = downloadManager.getUriForDownloadedFile(activeDownloadId)?.lastPathSegment ?: "download.apk"
+            val lowerName = fileName.lowercase()
+            if (lowerName.endsWith(".aab")) {
+                AlertDialog.Builder(this@MainActivity)
+                    .setTitle("AAB conversion required")
+                    .setMessage("Android App Bundle (.aab) files cannot be installed directly. Nationestore must first convert this bundle into installable APK files using Google's bundletool on a trusted build server. This file has not been installed.")
+                    .setPositiveButton("OK", null).show()
+            } else if (lowerName.endsWith(".xapk") || lowerName.endsWith(".apks") || lowerName.endsWith(".apkm")) {
+                AndroidPackageInstaller.scanAndInstall(this@MainActivity, uri) { message ->
+                    runOnUiThread {
+                        AlertDialog.Builder(this@MainActivity).setTitle("Nationestore Security Shield")
+                            .setMessage(message)
+                            .setPositiveButton("Continue") { _, _ -> AndroidPackageInstaller.installArchive(this@MainActivity, uri) }
+                            .setNegativeButton("Cancel", null).show()
+                    }
+                }
+            } else {
+                ApkSecurityScanner.scan(this@MainActivity, uri) { report ->
+                    runOnUiThread {
+                        if (!report.isInstallAllowed) {
+                            AlertDialog.Builder(this@MainActivity).setTitle("Installation blocked")
+                                .setMessage("Nationestore could not verify this APK's basic package information. It will not be opened.\n\n${report.summary}")
+                                .setPositiveButton("OK", null).show()
+                        } else {
+                            val details = "Package: ${report.packageName ?: "Unknown"}\nVersion: ${report.versionName ?: "Unknown"}\nSHA-256: ${report.sha256}\n\n" +
+                                (if (report.warnings.isEmpty()) "No basic static-check warnings were found." else "Warnings:\n• " + report.warnings.joinToString("\n• ")) +
+                                "\n\nThis is a basic static check, not a full antivirus scan. Android will perform its own checks."
+                            AlertDialog.Builder(this@MainActivity).setTitle("Nationestore Security Shield").setMessage(details)
+                                .setNegativeButton("Cancel", null).setPositiveButton("Continue to Android installer") { _, _ -> openAndroidInstaller(uri) }.show()
                         }
-                        AlertDialog.Builder(this@MainActivity)
-                            .setTitle("Nationestore Security Shield")
-                            .setMessage(details)
-                            .setNegativeButton("Cancel", null)
-                            .setPositiveButton("Continue to Android installer") { _, _ -> openAndroidInstaller(uri) }
-                            .show()
                     }
                 }
             }
@@ -201,10 +209,17 @@ class MainActivity : Activity() {
             }
         }
         webView.setDownloadListener(DownloadListener { url, _, contentDisposition, mimeType, _ ->
-            val isApk = url.endsWith(".apk", ignoreCase = true) ||
-                mimeType.equals("application/vnd.android.package-archive", ignoreCase = true)
-            if (isApk) enqueueApkDownload(url, contentDisposition)
-            else Toast.makeText(this, "This file is not an Android APK.", Toast.LENGTH_SHORT).show()
+            val path = Uri.parse(url).path.orEmpty().lowercase()
+            val disposition = contentDisposition.orEmpty().lowercase()
+            val extension = when {
+                ".xapk" in path || "xapk" in disposition || "/xapk/" in path -> "xapk"
+                ".apks" in path || "apks" in disposition -> "apks"
+                ".apkm" in path || "apkm" in disposition -> "apkm"
+                ".aab" in path || "aab" in disposition -> "aab"
+                else -> "apk"
+            }
+            if (extension in listOf("apk", "xapk", "apks", "apkm", "aab")) enqueueApkDownload(url, contentDisposition, extension)
+            else Toast.makeText(this, "Unsupported download format.", Toast.LENGTH_SHORT).show()
         })
     }
 
@@ -269,18 +284,19 @@ class MainActivity : Activity() {
         errorPanel.visibility = View.VISIBLE
     }
 
-    private fun enqueueApkDownload(url: String, contentDisposition: String?) {
+    private fun enqueueApkDownload(url: String, contentDisposition: String?, extension: String) {
         val parsed = Uri.parse(url)
         if (parsed.scheme != "https") {
-            Toast.makeText(this, "For safety, APK downloads must use a secure HTTPS link.", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "For safety, app downloads must use a secure HTTPS link.", Toast.LENGTH_LONG).show()
             return
         }
+        val fileName = "nationestore-${System.currentTimeMillis()}.$extension"
         val request = DownloadManager.Request(parsed)
             .setTitle("Nationestore app download")
-            .setDescription("Downloading APK for basic security checks")
-            .setMimeType("application/vnd.android.package-archive")
+            .setDescription("Downloading app package for security checks")
+            .setMimeType(if (extension == "apk") "application/vnd.android.package-archive" else "application/octet-stream")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "nationestore-${System.currentTimeMillis()}.apk")
+            .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, fileName)
         activeDownloadId = downloadManager.enqueue(request)
         Toast.makeText(this, "Download started. You’ll be asked to review the security check before installation.", Toast.LENGTH_LONG).show()
     }
